@@ -1,6 +1,5 @@
-use crate::parse::from_digit;
 use color_eyre::{eyre::ContextCompat, Result};
-use parse::{from_string_and_digit, parse, Parse};
+use parse::{from_digit, from_string_and_digit, parse, Parse};
 
 mod parse {
     use nom::{
