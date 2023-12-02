@@ -32,14 +32,15 @@ mod parse {
     }
 
     pub fn parse(i: &str) -> IResult<&str, Game> {
-        let (_, (_, id, _, draws)) = tuple((
-            tag("Game "),
-            nom_u32,
-            tag(": "),
-            separated_list0(tag("; "), draw),
-        ))(i)?;
-
-        Ok((i, Game { id, draws }))
+        map(
+            tuple((
+                tag("Game "),
+                nom_u32,
+                tag(": "),
+                separated_list0(tag("; "), draw),
+            )),
+            |(_, id, _, draws)| Game { id, draws },
+        )(i)
     }
 }
 
