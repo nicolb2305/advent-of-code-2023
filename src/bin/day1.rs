@@ -5,7 +5,7 @@ mod parse {
     use nom::{
         branch::alt,
         bytes::complete::{tag, take},
-        combinator::map,
+        combinator::{map, value},
         error::{Error, ErrorKind, ParseError},
         multi::many1,
         Err, IResult, Parser,
@@ -15,20 +15,18 @@ mod parse {
     impl<'a, T> Parse<'a> for T where T: Parser<&'a str, u32, Error<&'a str>> + Copy {}
 
     pub fn from_string_and_digit(i: &str) -> IResult<&str, u32> {
-        let num = |num_name, num_int| map(tag(num_name), move |_| num_int);
-
         let (_, num) = alt((
             from_digit,
             alt((
-                num("one", 1),
-                num("two", 2),
-                num("three", 3),
-                num("four", 4),
-                num("five", 5),
-                num("six", 6),
-                num("seven", 7),
-                num("eight", 8),
-                num("nine", 9),
+                value(1, tag("one")),
+                value(2, tag("two")),
+                value(3, tag("three")),
+                value(4, tag("four")),
+                value(5, tag("five")),
+                value(6, tag("six")),
+                value(7, tag("seven")),
+                value(8, tag("eight")),
+                value(9, tag("nine")),
             )),
         ))(i)?;
 
