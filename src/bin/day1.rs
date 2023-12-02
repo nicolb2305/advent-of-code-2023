@@ -45,9 +45,8 @@ mod parse {
 
     pub fn parse<'a>(parser: impl Parse<'a>) -> impl FnMut(&'a str) -> Option<Vec<u32>> {
         move |input| {
-            let any =
-                |parser| move |input| alt((map(parser, Some), map(take(1usize), |_| None)))(input);
-            let (_, nums) = many1(any(parser))(input).ok()?;
+            let (_, nums) =
+                many1(alt((map(parser, Some), map(take(1usize), |_| None))))(input).ok()?;
             Some(nums.into_iter().flatten().collect())
         }
     }
