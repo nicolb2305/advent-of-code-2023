@@ -11,8 +11,8 @@ mod parse {
         Err, IResult, Parser,
     };
 
-    pub trait Parse<'a, O>: Parser<&'a str, O, Error<&'a str>> {}
-    impl<'a, O, T> Parse<'a, O> for T where T: Parser<&'a str, O, Error<&'a str>> {}
+    pub trait Parse<'a>: Parser<&'a str, u32, Error<&'a str>> {}
+    impl<'a, T> Parse<'a> for T where T: Parser<&'a str, u32, Error<&'a str>> {}
 
     pub fn from_string_and_digit(i: &str) -> IResult<&str, u32> {
         let num = |num_name, num_int| map(tag(num_name), move |_| num_int);
@@ -43,9 +43,7 @@ mod parse {
             .map_err(|_| Err::Error(Error::from_error_kind(i, ErrorKind::IsNot)))
     }
 
-    pub fn parse<'a>(
-        parser: impl Parse<'a, u32> + Copy,
-    ) -> impl FnMut(&'a str) -> Option<Vec<u32>> {
+    pub fn parse<'a>(parser: impl Parse<'a> + Copy) -> impl FnMut(&'a str) -> Option<Vec<u32>> {
         move |input| {
             let any =
                 |parser| move |input| alt((map(parser, Some), map(take(1usize), |_| None)))(input);
@@ -55,7 +53,7 @@ mod parse {
     }
 }
 
-fn calibrate<'a>(input: &'a str, parser: impl Parse<'a, u32> + Copy) -> Option<u32> {
+fn calibrate<'a>(input: &'a str, parser: impl Parse<'a> + Copy) -> Option<u32> {
     input
         .lines()
         .map(parse(parser))
