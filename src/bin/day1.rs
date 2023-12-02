@@ -43,19 +43,16 @@ mod parse {
             .map_err(|_| Err::Error(Error::from_error_kind(i, ErrorKind::IsNot)))
     }
 
-    pub fn parse<'a>(parser: impl Parse<'a>) -> impl FnMut(&'a str) -> Option<Vec<u32>> {
-        move |input| {
-            let (_, nums) =
-                many1(alt((map(parser, Some), map(take(1usize), |_| None))))(input).ok()?;
-            Some(nums.into_iter().flatten().collect())
-        }
+    pub fn parse<'a>(input: &'a str, parser: impl Parse<'a>) -> Option<Vec<u32>> {
+        let (_, nums) = many1(alt((map(parser, Some), map(take(1usize), |_| None))))(input).ok()?;
+        Some(nums.into_iter().flatten().collect())
     }
 }
 
 fn calibrate<'a>(input: &'a str, parser: impl Parse<'a>) -> Option<u32> {
     input
         .lines()
-        .map(parse(parser))
+        .map(|input| parse(input, parser))
         .map(|res| {
             res.and_then(|list| {
                 let first = list.first()?;
