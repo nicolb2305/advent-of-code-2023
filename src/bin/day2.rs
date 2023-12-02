@@ -1,9 +1,49 @@
-use color_eyre::Result;
 use parse::parse;
-use strum::EnumString;
 
-#[derive(Debug, EnumString, Clone, Copy)]
-#[strum(serialize_all = "snake_case")]
+mod parse {
+    use crate::{Color, Draw, Game};
+    use nom::{
+        branch::alt,
+        bytes::complete::tag,
+        character::complete::{space0, u32 as nom_u32},
+        combinator::{map, value},
+        multi::separated_list0,
+        sequence::{separated_pair, tuple},
+        IResult,
+    };
+    use std::convert::Into;
+
+    fn draw(i: &str) -> IResult<&str, Draw> {
+        map(
+            separated_list0(
+                tag(", "),
+                separated_pair(
+                    nom_u32,
+                    space0,
+                    alt((
+                        value(Color::Red, tag("red")),
+                        value(Color::Green, tag("green")),
+                        value(Color::Blue, tag("blue")),
+                    )),
+                ),
+            ),
+            Into::into,
+        )(i)
+    }
+
+    pub fn parse(i: &str) -> IResult<&str, Game> {
+        let (_, (_, id, _, draws)) = tuple((
+            tag("Game "),
+            nom_u32,
+            tag(": "),
+            separated_list0(tag("; "), draw),
+        ))(i)?;
+
+        Ok((i, Game { id, draws }))
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 enum Color {
     Red,
     Green,
@@ -60,48 +100,9 @@ impl Game {
     }
 }
 
-mod parse {
-    use crate::{Color, Draw, Game};
-    use color_eyre::{eyre::eyre, Result};
-    use nom::{
-        bytes::complete::tag,
-        character::complete::{alpha1, space0, u32 as nom_u32},
-        error::{Error, ErrorKind, ParseError},
-        multi::separated_list0,
-        sequence::{separated_pair, tuple},
-        Err, IResult,
-    };
-    use std::str::FromStr;
-
-    fn color(i: &str) -> IResult<&str, Color> {
-        let (i, color) = alpha1(i)?;
-        Ok((
-            i,
-            Color::from_str(color)
-                .map_err(|_| Err::Error(Error::from_error_kind(i, ErrorKind::NoneOf)))?,
-        ))
-    }
-
-    fn draw(i: &str) -> IResult<&str, Draw> {
-        let (i, colors) = separated_list0(tag(", "), separated_pair(nom_u32, space0, color))(i)?;
-        Ok((i, colors.into()))
-    }
-
-    pub fn parse(i: &str) -> Result<Game> {
-        let (_, (_, id, _, draws)) = tuple((
-            tag("Game "),
-            nom_u32,
-            tag(": "),
-            separated_list0(tag("; "), draw),
-        ))(i)
-        .map_err(|_| eyre!("invalid row"))?;
-
-        Ok(Game { id, draws })
-    }
-}
-
 fn main() {
     let input = include_str!("../../input/day2.txt");
+
     let max_draw = Draw {
         red: 12,
         green: 13,
@@ -109,8 +110,7 @@ fn main() {
     };
     let id_sum: u32 = input
         .lines()
-        .map(parse)
-        .map(Result::unwrap)
+        .map(|line| parse(line).unwrap().1)
         .filter(|game| game.is_valid(&max_draw))
         .map(|game| game.id)
         .sum();
@@ -118,10 +118,7 @@ fn main() {
 
     let power: u32 = input
         .lines()
-        .map(parse)
-        .map(Result::unwrap)
-        .map(|game| game.fewest_possible())
-        .map(|draw| draw.power())
+        .map(|line| parse(line).unwrap().1.fewest_possible().power())
         .sum();
     println!("Sum of power of fewest possible cubes: {power}");
 }
