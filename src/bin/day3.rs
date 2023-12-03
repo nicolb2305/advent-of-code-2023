@@ -16,41 +16,36 @@ struct Symbol {
 fn parse(input: &str) -> (Vec<Number>, Vec<Symbol>) {
     let mut numbers = vec![];
     let mut symbols = vec![];
-    let mut bytes = input
+    let mut chars = input
         .lines()
         .enumerate()
-        .flat_map(|(i, line)| {
-            line.as_bytes()
-                .iter()
-                .enumerate()
-                .map(move |(j, c)| (i, j, c))
-        })
+        .flat_map(|(i, line)| line.chars().enumerate().map(move |(j, c)| (i, j, c)))
         .peekable();
-    while let Some(&(row, col, next)) = bytes.peek() {
+    while let Some(&(row, col, next)) = chars.peek() {
         match next {
-            b'.' => {
-                bytes.next();
+            '.' => {
+                chars.next();
             }
             num if num.is_ascii_digit() => {
-                let mut bytes_vec = vec![];
-                while let Some(&(_, _, next)) = bytes.peek() {
+                let mut chars_vec = vec![];
+                while let Some(&(_, _, next)) = chars.peek() {
                     if !next.is_ascii_digit() {
                         break;
                     }
-                    bytes_vec.push(*bytes.next().unwrap().2);
+                    chars_vec.push(chars.next().unwrap().2);
                 }
-                let len = bytes_vec.len();
+                let len = chars_vec.len();
                 numbers.push(Number {
                     rows: (row as i32 - 1)..=(row as i32 + 1),
                     cols: (col as i32 - 1)..=(col as i32 + len as i32),
-                    num: std::str::from_utf8(&bytes_vec).unwrap().parse().unwrap(),
+                    num: String::from_iter(chars_vec).parse().unwrap(),
                 });
             }
             _ => {
                 symbols.push(Symbol {
                     row: row as i32,
                     col: col as i32,
-                    symbol: *bytes.next().unwrap().2 as char,
+                    symbol: chars.next().unwrap().2,
                 });
             }
         }
