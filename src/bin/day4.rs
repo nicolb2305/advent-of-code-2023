@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use color_eyre::eyre::Result;
 use nom::{
     bytes::complete::tag,
@@ -10,16 +12,13 @@ use nom::{
 #[derive(Debug)]
 struct Game {
     _id: u32,
-    winning_nums: Vec<u32>,
-    played_nums: Vec<u32>,
+    winning_nums: HashSet<u32>,
+    played_nums: HashSet<u32>,
 }
 
 impl Game {
     fn matches(&self) -> usize {
-        self.played_nums
-            .iter()
-            .filter(|num| self.winning_nums.contains(num))
-            .count()
+        self.played_nums.intersection(&self.winning_nums).count()
     }
 
     fn score(&self) -> u32 {
@@ -50,8 +49,8 @@ fn parse(input: &str) -> IResult<&str, Game> {
         i,
         Game {
             _id: id,
-            winning_nums,
-            played_nums,
+            winning_nums: HashSet::from_iter(winning_nums),
+            played_nums: HashSet::from_iter(played_nums),
         },
     ))
 }
