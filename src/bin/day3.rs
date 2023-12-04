@@ -5,6 +5,12 @@ struct Number {
     num: i32,
 }
 
+impl Number {
+    fn contains(&self, symbol: &Symbol) -> bool {
+        self.rows.contains(&symbol.row) && self.cols.contains(&symbol.col)
+    }
+}
+
 #[derive(Debug)]
 struct Symbol {
     row: i32,
@@ -60,11 +66,7 @@ fn main() {
 
     let sum: i32 = nums
         .iter()
-        .filter(|num| {
-            symbols
-                .iter()
-                .any(|symbol| num.rows.contains(&symbol.row) && num.cols.contains(&symbol.col))
-        })
+        .filter(|num| symbols.iter().any(|symbol| num.contains(symbol)))
         .map(|num| num.num)
         .sum();
     println!("Sum of part numbers: {sum}");
@@ -73,10 +75,7 @@ fn main() {
         .iter()
         .filter(|symbol| symbol.symbol == '*')
         .map(|symbol| {
-            let adjacent: Vec<_> = nums
-                .iter()
-                .filter(|num| num.rows.contains(&symbol.row) && num.cols.contains(&symbol.col))
-                .collect();
+            let adjacent: Vec<_> = nums.iter().filter(|num| num.contains(symbol)).collect();
             if adjacent.len() == 2 {
                 adjacent.iter().map(|num| num.num).product()
             } else {
