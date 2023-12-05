@@ -2,6 +2,88 @@ use crate::parse::parse;
 use rayon::prelude::*;
 use std::ops::Range;
 
+trait SetOperations
+where
+    Self: Sized,
+{
+    fn disjoint(&self, other: &Self) -> bool;
+    fn contained_in(&self, other: &Self) -> bool;
+    fn overlap(&self, other: &Self) -> bool;
+    fn adjacent(&self, other: &Self) -> bool;
+    fn union(&self, other: &Self) -> Option<Self>;
+    fn intersection(&self, other: &Self) -> Option<Self>;
+}
+
+impl<T> SetOperations for Range<T>
+where
+    T: Ord + Copy,
+{
+    fn disjoint(&self, other: &Self) -> bool {
+        self.end <= other.start || self.start >= other.end
+    }
+
+    fn contained_in(&self, other: &Self) -> bool {
+        self.start >= other.start && self.end <= other.end
+    }
+
+    fn overlap(&self, other: &Self) -> bool {
+        (self.start >= other.start && self.start < other.end)
+            || (self.end <= other.end && self.end > other.start)
+    }
+
+    fn adjacent(&self, other: &Self) -> bool {
+        self.start == other.end || self.end == other.start
+    }
+
+    fn union(&self, other: &Self) -> Option<Self> {
+        if self.overlap(other) || self.adjacent(other) {
+            Some(self.start.min(other.start)..self.end.max(other.end))
+        } else {
+            None
+        }
+    }
+
+    fn intersection(&self, other: &Self) -> Option<Self> {
+        if self.overlap(other) {
+            Some(self.start.max(other.start)..self.end.min(other.end))
+        } else {
+            None
+        }
+    }
+}
+
+struct RangeMapping {
+    mapped: Option<Range<u64>>,
+    unmapped1: Option<Range<u64>>,
+    unmapped2: Option<Range<u64>>,
+}
+
+impl RangeMapping {
+    fn from_mapped(mapped: Range<u64>) -> Self {
+        Self {
+            mapped: Some(mapped),
+            unmapped1: None,
+            unmapped2: None,
+        }
+    }
+
+    fn from_unmapped(unmapped: Range<u64>) -> Self {
+        Self {
+            mapped: None,
+            unmapped1: Some(unmapped),
+            unmapped2: None,
+        }
+    }
+
+    fn from_both(mapped: Range<u64>, unmapped1: Range<u64>, unmapped2: Option<Range<u64>>) -> Self {
+        Self {
+            mapped: Some(mapped),
+            unmapped1: Some(unmapped1),
+            unmapped2,
+        }
+    }
+}
+
 mod parse {
     use crate::{Almanac, Map, Mapping};
     use nom::{
@@ -73,33 +155,33 @@ impl Mapping {
 
     // Return a tuple of mapped-to range and vector of ranges that were not mapped
     #[allow(clippy::single_range_in_vec_init)]
-    fn map_range(&self, input: &Range<u64>) -> (Option<Range<u64>>, Option<Vec<Range<u64>>>) {
+    fn map_range(&self, input: &Range<u64>) -> RangeMapping {
         match (self.map(input.start), self.map(input.end)) {
             // All locations are mapped, nothing unmapped
-            (Some(start), Some(end)) => (Some(start..end), None),
+            (Some(start), Some(end)) => RangeMapping::from_mapped(start..end),
             // Start of input is mapped, remainder is not
-            (Some(start), None) => (
-                Some(start..self.destination.end),
-                Some(vec![self.source.end..input.end]),
+            (Some(start), None) => RangeMapping::from_both(
+                start..self.destination.end,
+                self.source.end..input.end,
+                None,
             ),
             // End of input is mapped, start is not
-            (None, Some(end)) => (
-                Some(self.destination.start..end),
-                Some(vec![input.start..self.source.start]),
+            (None, Some(end)) => RangeMapping::from_both(
+                self.destination.start..end,
+                input.start..self.source.start,
+                None,
             ),
             // Unknown amount is mapped
             (None, None) => {
                 if input.end <= self.source.start || input.start >= self.source.end {
                     // Range is entirely before or after mapping range, nothing is mapped
-                    (None, Some(vec![input.clone()]))
+                    RangeMapping::from_unmapped(input.clone())
                 } else {
                     // Some part in the middle of input range is mapped, start and end are not
-                    (
-                        Some(self.destination.clone()),
-                        Some(vec![
-                            input.start..self.source.start,
-                            self.source.end..input.end,
-                        ]),
+                    RangeMapping::from_both(
+                        self.destination.clone(),
+                        input.start..self.source.start,
+                        Some(self.source.end..input.end),
                     )
                 }
             }
@@ -122,18 +204,24 @@ impl Map {
 
     fn map_range(&self, input: &[Range<u64>]) -> Vec<Range<u64>> {
         // Locations that have been mapped to
-        let mut all_mapped = vec![];
+        let mut all_mapped = Vec::with_capacity(input.len());
         // Map all input ranges and unmapped ranges from previous maps
         let all_unmapped = self.mappings.iter().fold(input.to_vec(), |v, map| {
-            let mut all_unmapped = vec![];
-            for (mapped, unmapped) in v.iter().map(|range| map.map_range(range)) {
+            let mut all_unmapped = Vec::with_capacity(v.len());
+            for RangeMapping {
+                mapped,
+                unmapped1,
+                unmapped2,
+            } in v.iter().map(|range| map.map_range(range))
+            {
                 if let Some(mapped) = mapped {
                     all_mapped.push(mapped);
                 }
-                if let Some(unmapped) = unmapped {
-                    for unmapped in unmapped {
-                        all_unmapped.push(unmapped);
-                    }
+                if let Some(unmapped) = unmapped1 {
+                    all_unmapped.push(unmapped);
+                }
+                if let Some(unmapped) = unmapped2 {
+                    all_unmapped.push(unmapped);
                 }
             }
             all_unmapped
@@ -184,15 +272,17 @@ impl Almanac {
 }
 
 fn main() {
-    let input = include_str!("../../input/day5.txt");
+    let input = include_str!("../../input/day5_bigboy.txt");
     let almanac = parse(input).unwrap().1;
 
     println!(
         "Lowest location for individual seeds: {}",
         almanac.lowest_location()
     );
+    // assert_eq!(almanac.lowest_location(), 388_071_289);
     println!(
         "Lowest location for ranges of seeds: {}",
         almanac.lowest_location_ranges()
     );
+    // assert_eq!(almanac.lowest_location_ranges(), 84_206_669);
 }
