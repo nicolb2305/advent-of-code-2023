@@ -171,20 +171,16 @@ impl Mapping {
                 input.start..self.source.start,
                 None,
             ),
-            // Unknown amount is mapped
-            (None, None) => {
-                if input.end <= self.source.start || input.start >= self.source.end {
-                    // Range is entirely before or after mapping range, nothing is mapped
-                    RangeMapping::from_unmapped(input.clone())
-                } else {
-                    // Some part in the middle of input range is mapped, start and end are not
-                    RangeMapping::from_both(
-                        self.destination.clone(),
-                        input.start..self.source.start,
-                        Some(self.source.end..input.end),
-                    )
-                }
+            // Range is entirely before or after mapping range, nothing is mapped
+            (None, None) if input.disjoint(&self.source) => {
+                RangeMapping::from_unmapped(input.clone())
             }
+            // Some part in the middle of input range is mapped, start and end are not
+            (None, None) => RangeMapping::from_both(
+                self.destination.clone(),
+                input.start..self.source.start,
+                Some(self.source.end..input.end),
+            ),
         }
     }
 }
