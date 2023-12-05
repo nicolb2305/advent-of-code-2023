@@ -226,13 +226,17 @@ impl Map {
             }
             all_unmapped
         });
-        // All remaning ranges unmapped ranges map to themselves
-        let len = all_mapped.len();
-        all_mapped
+        // All remaining ranges unmapped ranges map to themselves
+        let mut mapped: Vec<_> = all_mapped
             .into_iter()
             .chain(all_unmapped)
             .filter(|range| !range.is_empty())
-            .fold(Vec::with_capacity(len), |mut v, range| {
+            .collect();
+        let mut prev_len = mapped.len() + 1;
+        // Iteratively perform unions of ranges until all ranges are disjoint
+        while mapped.len() < prev_len {
+            prev_len = mapped.len();
+            mapped = mapped.into_iter().fold(vec![], |mut v, range| {
                 if let Some((i, union)) = v
                     .iter()
                     .enumerate()
@@ -244,7 +248,9 @@ impl Map {
                     v.push(range);
                 }
                 v
-            })
+            });
+        }
+        mapped
     }
 }
 
