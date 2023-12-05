@@ -227,11 +227,24 @@ impl Map {
             all_unmapped
         });
         // All remaning ranges unmapped ranges map to themselves
+        let len = all_mapped.len();
         all_mapped
             .into_iter()
             .chain(all_unmapped)
             .filter(|range| !range.is_empty())
-            .collect()
+            .fold(Vec::with_capacity(len), |mut v, range| {
+                if let Some((i, union)) = v
+                    .iter()
+                    .enumerate()
+                    .find_map(|(i, other)| range.union(other).map(move |union| (i, union)))
+                {
+                    v.remove(i);
+                    v.push(union);
+                } else {
+                    v.push(range);
+                }
+                v
+            })
     }
 }
 
@@ -272,17 +285,17 @@ impl Almanac {
 }
 
 fn main() {
-    let input = include_str!("../../input/day5_bigboy.txt");
+    let input = include_str!("../../input/day5.txt");
     let almanac = parse(input).unwrap().1;
 
     println!(
         "Lowest location for individual seeds: {}",
         almanac.lowest_location()
     );
-    // assert_eq!(almanac.lowest_location(), 388_071_289);
+    assert_eq!(almanac.lowest_location(), 388_071_289);
     println!(
         "Lowest location for ranges of seeds: {}",
         almanac.lowest_location_ranges()
     );
-    // assert_eq!(almanac.lowest_location_ranges(), 84_206_669);
+    assert_eq!(almanac.lowest_location_ranges(), 84_206_669);
 }
