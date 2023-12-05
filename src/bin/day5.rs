@@ -1,4 +1,5 @@
 use crate::parse::parse;
+use rayon::prelude::*;
 use std::ops::Range;
 
 mod parse {
@@ -174,7 +175,7 @@ impl Almanac {
 
     fn lowest_location_ranges(&self) -> u64 {
         self.seed_ranges
-            .iter()
+            .par_iter()
             .flat_map(|seed_range| self.seed_range_to_lowest_location(seed_range))
             .map(|range| range.start)
             .min()
