@@ -1,5 +1,5 @@
 use crate::parse::parse;
-use color_eyre::Result;
+use anyhow::{anyhow, Context, Result};
 use rayon::prelude::*;
 use std::ops::Range;
 
@@ -87,7 +87,7 @@ impl RangeMapping {
 
 mod parse {
     use crate::{Almanac, Map, Mapping};
-    use color_eyre::{eyre::eyre, Result};
+    use anyhow::{anyhow, Result};
     use winnow::{
         ascii::{alpha1, dec_uint, line_ending, multispace1},
         combinator::separated,
@@ -134,7 +134,7 @@ mod parse {
     }
 
     pub fn parse(i: &str) -> Result<Almanac> {
-        parser.parse(i).map_err(|e| eyre!(e.to_string()))
+        parser.parse(i).map_err(|e| anyhow!(e.to_string()))
     }
 }
 
@@ -261,12 +261,11 @@ impl Almanac {
         self.maps.iter().fold(seed, |x, map| map.map(x))
     }
 
-    fn lowest_location(&self) -> u64 {
+    fn lowest_location(&self) -> Option<u64> {
         self.seeds
             .iter()
             .map(|&seed| self.seed_to_location(seed))
             .min()
-            .unwrap()
     }
 
     fn seed_range_to_lowest_location(&self, seed_range: &Range<u64>) -> Vec<Range<u64>> {
@@ -291,7 +290,9 @@ fn main() -> Result<()> {
 
     println!(
         "Lowest location for individual seeds: {}",
-        almanac.lowest_location()
+        almanac
+            .lowest_location()
+            .context(anyhow!("no locations found"))?
     );
     // assert_eq!(almanac.lowest_location(), 388_071_289);
     println!(

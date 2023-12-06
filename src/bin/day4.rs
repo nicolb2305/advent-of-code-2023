@@ -1,4 +1,4 @@
-use color_eyre::{eyre::eyre, Result};
+use anyhow::{anyhow, Result};
 use std::collections::HashSet;
 use winnow::{
     ascii::{dec_uint, multispace1},
@@ -51,7 +51,7 @@ fn parser(input: &mut &str) -> PResult<Game> {
 }
 
 fn parse(i: &str) -> Result<Game> {
-    parser.parse(i).map_err(|e| eyre!(e.to_string()))
+    parser.parse(i).map_err(|e| anyhow!(e.to_string()))
 }
 
 fn main() -> Result<()> {

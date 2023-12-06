@@ -1,4 +1,4 @@
-use color_eyre::{eyre::eyre, Result};
+use anyhow::{anyhow, Result};
 use derive_more::From;
 use winnow::{
     ascii::{dec_uint, line_ending, multispace1},
@@ -99,7 +99,7 @@ fn parser(i: &mut &str) -> PResult<Races> {
 }
 
 fn parse(i: &str) -> Result<Races> {
-    parser.parse(i).map_err(|e| eyre!(e.to_string()))
+    parser.parse(i).map_err(|e| anyhow!(e.to_string()))
 }
 
 fn main() -> Result<()> {
