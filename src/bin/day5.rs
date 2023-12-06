@@ -1,4 +1,5 @@
 use crate::parse::parse;
+use color_eyre::Result;
 use rayon::prelude::*;
 use std::ops::Range;
 
@@ -86,55 +87,54 @@ impl RangeMapping {
 
 mod parse {
     use crate::{Almanac, Map, Mapping};
-    use nom::{
-        bytes::complete::tag,
-        character::complete::{alpha1, line_ending, multispace1, u64 as nom_u64},
-        multi::{count, separated_list1},
-        sequence::tuple,
-        IResult,
+    use color_eyre::{eyre::eyre, Result};
+    use winnow::{
+        ascii::{alpha1, dec_uint, line_ending, multispace1},
+        combinator::separated,
+        prelude::*,
     };
 
-    fn mapping(i: &str) -> IResult<&str, Mapping> {
-        let (i, (dest_start, _, src_start, _, length)) =
-            tuple((nom_u64, multispace1, nom_u64, multispace1, nom_u64))(i)?;
-        Ok((
-            i,
-            Mapping {
-                source: src_start..(src_start + length),
-                destination: dest_start..(dest_start + length),
-            },
-        ))
+    fn mapping(i: &mut &str) -> PResult<Mapping> {
+        let (dest_start, _, src_start, _, length): (_, _, _, _, u64) =
+            (dec_uint, multispace1, dec_uint, multispace1, dec_uint).parse_next(i)?;
+        Ok(Mapping {
+            source: src_start..(src_start + length),
+            destination: dest_start..(dest_start + length),
+        })
     }
 
-    fn map(i: &str) -> IResult<&str, Map> {
-        let (i, (_, _, _, _, _, mappings)) = tuple((
+    fn map(i: &mut &str) -> PResult<Map> {
+        let (_, _, _, _, _, mappings) = (
             alpha1,
-            tag("-to-"),
+            "-to-",
             alpha1,
-            tag(" map:"),
+            " map:",
             multispace1,
-            separated_list1(line_ending, mapping),
-        ))(i)?;
-        Ok((i, Map { mappings }))
+            separated(1.., mapping, line_ending),
+        )
+            .parse_next(i)?;
+        Ok(Map { mappings })
     }
 
-    pub fn parse(i: &str) -> IResult<&str, Almanac> {
-        let (i, (_, _, seeds, _, maps)) = tuple((
-            tag("seeds:"),
+    fn parser(i: &mut &str) -> PResult<Almanac> {
+        let (_, _, seeds, _, maps): (_, _, Vec<_>, _, Vec<_>) = (
+            "seeds:",
             multispace1,
-            separated_list1(multispace1, nom_u64),
+            separated(1.., dec_uint::<_, u64, _>, multispace1),
             multispace1,
-            separated_list1(count(line_ending, 2), map),
-        ))(i)?;
+            separated(1.., map, multispace1),
+        )
+            .parse_next(i)?;
         let seed_ranges = seeds.chunks(2).map(|x| x[0]..(x[0] + x[1])).collect();
-        Ok((
-            i,
-            Almanac {
-                seeds,
-                seed_ranges,
-                maps,
-            },
-        ))
+        Ok(Almanac {
+            seeds,
+            seed_ranges,
+            maps,
+        })
+    }
+
+    pub fn parse(i: &str) -> Result<Almanac> {
+        parser.parse(i).map_err(|e| eyre!(e.to_string()))
     }
 }
 
@@ -285,9 +285,9 @@ impl Almanac {
     }
 }
 
-fn main() {
+fn main() -> Result<()> {
     let input = include_str!("../../input/day5.txt");
-    let almanac = parse(input).unwrap().1;
+    let almanac = parse(input)?;
 
     println!(
         "Lowest location for individual seeds: {}",
@@ -299,4 +299,6 @@ fn main() {
         almanac.lowest_location_ranges()
     );
     // assert_eq!(almanac.lowest_location_ranges(), 84_206_669);
+
+    Ok(())
 }
