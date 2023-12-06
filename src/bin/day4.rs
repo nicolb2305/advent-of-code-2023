@@ -1,12 +1,9 @@
+use color_eyre::{eyre::eyre, Result};
 use std::collections::HashSet;
-
-use color_eyre::eyre::Result;
-use nom::{
-    bytes::complete::tag,
-    character::complete::{char as nom_char, multispace1, u32 as nom_u32},
-    multi::separated_list1,
-    sequence::{separated_pair, tuple},
-    IResult,
+use winnow::{
+    ascii::{dec_uint, multispace1},
+    combinator::{separated, separated_pair},
+    prelude::*,
 };
 
 #[derive(Debug)]
@@ -31,36 +28,35 @@ impl Game {
     }
 }
 
-fn parse(input: &str) -> IResult<&str, Game> {
-    let (i, (_, _, id, _, _, (winning_nums, played_nums))) = tuple((
-        tag("Card"),
+fn parser(input: &mut &str) -> PResult<Game> {
+    let (_, _, id, _, _, (winning_nums, played_nums)) = (
+        "Card",
         multispace1,
-        nom_u32,
-        nom_char(':'),
+        dec_uint,
+        ':',
         multispace1,
         separated_pair(
-            separated_list1(multispace1, nom_u32),
-            tuple((multispace1, nom_char('|'), multispace1)),
-            separated_list1(multispace1, nom_u32),
+            separated(1.., dec_uint, multispace1),
+            (multispace1, '|', multispace1),
+            separated(1.., dec_uint, multispace1),
         ),
-    ))(input)?;
+    )
+        .parse_next(input)?;
 
-    Ok((
-        i,
-        Game {
-            _id: id,
-            winning_nums: HashSet::from_iter(winning_nums),
-            played_nums: HashSet::from_iter(played_nums),
-        },
-    ))
+    Ok(Game {
+        _id: id,
+        winning_nums,
+        played_nums,
+    })
+}
+
+fn parse(i: &str) -> Result<Game> {
+    parser.parse(i).map_err(|e| eyre!(e.to_string()))
 }
 
 fn main() -> Result<()> {
     let input = include_str!("../../input/day4.txt");
-    let games = input
-        .lines()
-        .map(|line| parse(line).map(|game| game.1))
-        .collect::<Result<Vec<_>, _>>()?;
+    let games = input.lines().map(parse).collect::<Result<Vec<_>, _>>()?;
 
     let score: u32 = games.iter().map(Game::score).sum();
     println!("Total points: {score}");
