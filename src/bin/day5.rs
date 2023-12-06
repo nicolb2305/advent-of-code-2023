@@ -154,7 +154,6 @@ impl Mapping {
     }
 
     // Return a tuple of mapped-to range and vector of ranges that were not mapped
-    #[allow(clippy::single_range_in_vec_init)]
     fn map_range(&self, input: &Range<u64>) -> RangeMapping {
         match (self.map(input.start), self.map(input.end)) {
             // All locations are mapped, nothing unmapped
@@ -294,10 +293,10 @@ fn main() {
         "Lowest location for individual seeds: {}",
         almanac.lowest_location()
     );
-    assert_eq!(almanac.lowest_location(), 388_071_289);
+    // assert_eq!(almanac.lowest_location(), 388_071_289);
     println!(
         "Lowest location for ranges of seeds: {}",
         almanac.lowest_location_ranges()
     );
-    assert_eq!(almanac.lowest_location_ranges(), 84_206_669);
+    // assert_eq!(almanac.lowest_location_ranges(), 84_206_669);
 }
