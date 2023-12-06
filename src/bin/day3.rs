@@ -1,3 +1,5 @@
+use anyhow::{anyhow, Context, Result};
+
 #[derive(Debug)]
 struct Number {
     rows: std::ops::RangeInclusive<i32>,
@@ -19,7 +21,7 @@ struct Symbol {
 }
 
 #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
-fn parse(input: &str) -> (Vec<Number>, Vec<Symbol>) {
+fn parse(input: &str) -> Result<(Vec<Number>, Vec<Symbol>)> {
     let mut numbers = vec![];
     let mut symbols = vec![];
     let mut chars = input
@@ -38,31 +40,31 @@ fn parse(input: &str) -> (Vec<Number>, Vec<Symbol>) {
                     if !next.is_ascii_digit() {
                         break;
                     }
-                    chars_vec.push(chars.next().unwrap().2);
+                    chars_vec.push(chars.next().context(anyhow!("should not happend"))?.2);
                 }
                 let len = chars_vec.len();
                 numbers.push(Number {
                     rows: (row as i32 - 1)..=(row as i32 + 1),
                     cols: (col as i32 - 1)..=(col as i32 + len as i32),
-                    num: String::from_iter(chars_vec).parse().unwrap(),
+                    num: String::from_iter(chars_vec).parse()?,
                 });
             }
             _ => {
                 symbols.push(Symbol {
                     row: row as i32,
                     col: col as i32,
-                    symbol: chars.next().unwrap().2,
+                    symbol: chars.next().context(anyhow!("should not happen"))?.2,
                 });
             }
         }
     }
 
-    (numbers, symbols)
+    Ok((numbers, symbols))
 }
 
-fn main() {
+fn main() -> Result<()> {
     let input = include_str!("../../input/day3.txt");
-    let (nums, symbols) = parse(input);
+    let (nums, symbols) = parse(input)?;
 
     let sum: i32 = nums
         .iter()
@@ -84,4 +86,5 @@ fn main() {
         })
         .sum();
     println!("Sum of gear rations: {sum}");
+    Ok(())
 }
