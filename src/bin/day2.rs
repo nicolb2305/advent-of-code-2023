@@ -2,45 +2,40 @@ use parse::parse;
 
 mod parse {
     use crate::{Color, Draw, Game};
-    use nom::{
-        branch::alt,
-        bytes::complete::tag,
-        character::complete::{space0, u32 as nom_u32},
-        combinator::{map, value},
-        multi::separated_list0,
-        sequence::{separated_pair, tuple},
-        IResult,
-    };
+    use anyhow::{anyhow, Result};
     use std::convert::Into;
+    use winnow::{
+        ascii::{dec_uint, space0},
+        combinator::{alt, separated, separated_pair},
+        prelude::*,
+    };
 
-    fn draw(i: &str) -> IResult<&str, Draw> {
-        map(
-            separated_list0(
-                tag(", "),
-                separated_pair(
-                    nom_u32,
-                    space0,
-                    alt((
-                        value(Color::Red, tag("red")),
-                        value(Color::Green, tag("green")),
-                        value(Color::Blue, tag("blue")),
-                    )),
-                ),
+    fn draw(i: &mut &str) -> PResult<Draw> {
+        separated(
+            0..,
+            separated_pair(
+                dec_uint,
+                space0,
+                alt((
+                    "red".value(Color::Red),
+                    "green".value(Color::Green),
+                    "blue".value(Color::Blue),
+                )),
             ),
-            Into::into,
-        )(i)
+            ", ",
+        )
+        .map(|x: Vec<(u32, Color)>| x.into())
+        .parse_next(i)
     }
 
-    pub fn parse(i: &str) -> IResult<&str, Game> {
-        map(
-            tuple((
-                tag("Game "),
-                nom_u32,
-                tag(": "),
-                separated_list0(tag("; "), draw),
-            )),
-            |(_, id, _, draws)| Game { id, draws },
-        )(i)
+    fn parser(i: &mut &str) -> PResult<Game> {
+        ("Game ", dec_uint, ": ", separated(0.., draw, "; "))
+            .map(|(_, id, _, draws)| Game { id, draws })
+            .parse_next(i)
+    }
+
+    pub fn parse(i: &str) -> Result<Game> {
+        parser.parse(i).map_err(|e| anyhow!(e.to_string()))
     }
 }
 
@@ -111,7 +106,7 @@ fn main() {
     };
     let id_sum: u32 = input
         .lines()
-        .map(|line| parse(line).unwrap().1)
+        .flat_map(parse)
         .filter(|game| game.is_valid(&max_draw))
         .map(|game| game.id)
         .sum();
@@ -119,7 +114,8 @@ fn main() {
 
     let power: u32 = input
         .lines()
-        .map(|line| parse(line).unwrap().1.fewest_possible().power())
+        .flat_map(parse)
+        .map(|game| game.fewest_possible().power())
         .sum();
     println!("Sum of power of fewest possible cubes: {power}");
 }
