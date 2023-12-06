@@ -274,13 +274,12 @@ impl Almanac {
             .fold(vec![seed_range.clone()], |x, map| map.map_range(&x))
     }
 
-    fn lowest_location_ranges(&self) -> u64 {
+    fn lowest_location_ranges(&self) -> Option<u64> {
         self.seed_ranges
             .par_iter()
             .flat_map(|seed_range| self.seed_range_to_lowest_location(seed_range))
             .map(|range| range.start)
             .min()
-            .unwrap()
     }
 }
 
@@ -297,7 +296,9 @@ fn main() -> Result<()> {
     // assert_eq!(almanac.lowest_location(), 388_071_289);
     println!(
         "Lowest location for ranges of seeds: {}",
-        almanac.lowest_location_ranges()
+        almanac
+            .lowest_location_ranges()
+            .context(anyhow!("no locations found"))?
     );
     // assert_eq!(almanac.lowest_location_ranges(), 84_206_669);
 
