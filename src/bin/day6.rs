@@ -1,17 +1,16 @@
-use nom::{
-    bytes::complete::tag,
-    character::complete::{line_ending, multispace1, u64 as nom_u64},
-    combinator::map,
-    multi::separated_list1,
-    sequence::tuple,
-    IResult,
+use color_eyre::{eyre::eyre, Result};
+use derive_more::From;
+use winnow::{
+    ascii::{dec_uint, line_ending, multispace1},
+    combinator::separated,
+    prelude::*,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, From)]
 #[repr(transparent)]
 struct Milliseconds(u64);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, From)]
 #[repr(transparent)]
 struct Millimeters(u64);
 
@@ -38,10 +37,12 @@ impl Race {
         else {
             return 0;
         };
-        let last = (1..self.time.0)
+        let Some(last) = (1..self.time.0)
             .rev()
             .find(|&button_held| self.win(Milliseconds(button_held)))
-            .unwrap();
+        else {
+            return 0;
+        };
         last - first + 1
     }
 }
@@ -50,53 +51,60 @@ impl Race {
 struct Races(Vec<Race>);
 
 impl Races {
-    fn combine_races(&self) -> Race {
+    fn combine_races(&self) -> Result<Race> {
         let distance = Millimeters(
             self.0
                 .iter()
                 .map(|race| race.distance.0.to_string())
                 .collect::<String>()
-                .parse()
-                .unwrap(),
+                .parse()?,
         );
         let time = Milliseconds(
             self.0
                 .iter()
                 .map(|race| race.time.0.to_string())
                 .collect::<String>()
-                .parse()
-                .unwrap(),
+                .parse()?,
         );
 
-        Race { time, distance }
+        Ok(Race { time, distance })
     }
 }
 
-fn parse(i: &str) -> IResult<&str, Races> {
-    let (i, (_, _, times, _, _, _, distances)) = tuple((
-        tag("Time:"),
+fn parse_nums<T>(i: &mut &str) -> PResult<Vec<T>>
+where
+    T: From<u64>,
+{
+    separated(1.., dec_uint.map(T::from), multispace1).parse_next(i)
+}
+
+fn parser(i: &mut &str) -> PResult<Races> {
+    let (_, _, times, _, _, _, distances) = (
+        "Time:",
         multispace1,
-        separated_list1(multispace1, map(nom_u64, Milliseconds)),
+        parse_nums,
         line_ending,
-        tag("Distance:"),
+        "Distance:",
         multispace1,
-        separated_list1(multispace1, map(nom_u64, Millimeters)),
-    ))(i)?;
-    Ok((
-        i,
-        Races(
-            times
-                .into_iter()
-                .zip(distances)
-                .map(|(time, distance)| Race { time, distance })
-                .collect(),
-        ),
+        parse_nums,
+    )
+        .parse_next(i)?;
+    Ok(Races(
+        times
+            .into_iter()
+            .zip(distances)
+            .map(|(time, distance)| Race { time, distance })
+            .collect(),
     ))
 }
 
-fn main() {
+fn parse(i: &str) -> Result<Races> {
+    parser.parse(i).map_err(|e| eyre!(e.to_string()))
+}
+
+fn main() -> Result<()> {
     let input = include_str!("../../input/day6.txt");
-    let races = parse(input).unwrap().1;
+    let races = parse(input)?;
 
     println!(
         "Ways of winning multiplied: {}",
@@ -109,6 +117,8 @@ fn main() {
 
     println!(
         "Ways of winning large race: {}",
-        races.combine_races().winning_moves_count()
+        races.combine_races()?.winning_moves_count()
     );
+
+    Ok(())
 }
