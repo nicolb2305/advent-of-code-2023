@@ -14,7 +14,7 @@ pub enum Error {
 pub type DayResult<T> = Result<T, Error>;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, EnumIter, Clone, Copy)]
-pub enum OriginalCard {
+pub enum Card {
     Two,
     Three,
     Four,
@@ -30,7 +30,18 @@ pub enum OriginalCard {
     A,
 }
 
-impl FromStr for OriginalCard {
+impl Card {
+    fn joker_cmp(self, other: Self) -> Ordering {
+        match (self, other) {
+            (Self::J, Self::J) => Ordering::Equal,
+            (Self::J, _) => Ordering::Less,
+            (_, Self::J) => Ordering::Greater,
+            (x, y) => x.cmp(&y),
+        }
+    }
+}
+
+impl FromStr for Card {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -53,43 +64,6 @@ impl FromStr for OriginalCard {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, EnumIter, Clone, Copy)]
-pub enum NewCard {
-    J,
-    Two,
-    Three,
-    Four,
-    Five,
-    Six,
-    Seven,
-    Eight,
-    Nine,
-    T,
-    Q,
-    K,
-    A,
-}
-
-impl From<OriginalCard> for NewCard {
-    fn from(value: OriginalCard) -> Self {
-        match value {
-            OriginalCard::J => NewCard::J,
-            OriginalCard::Two => NewCard::Two,
-            OriginalCard::Three => NewCard::Three,
-            OriginalCard::Four => NewCard::Four,
-            OriginalCard::Five => NewCard::Five,
-            OriginalCard::Six => NewCard::Six,
-            OriginalCard::Seven => NewCard::Seven,
-            OriginalCard::Eight => NewCard::Eight,
-            OriginalCard::Nine => NewCard::Nine,
-            OriginalCard::T => NewCard::T,
-            OriginalCard::Q => NewCard::Q,
-            OriginalCard::K => NewCard::K,
-            OriginalCard::A => NewCard::A,
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum HandType {
     HighCard,
@@ -102,19 +76,10 @@ pub enum HandType {
 }
 
 pub trait Hand {
-    type Card;
-
-    fn number_of_a_kind_with_exclusion(
-        &self,
-        num: usize,
-        exclude: Option<Self::Card>,
-    ) -> Option<Self::Card>;
-    fn number_of_a_kind(&self, num: usize) -> Option<Self::Card>;
-    fn at_least_number_of_a_kind(
-        &self,
-        num: usize,
-        exclude: Option<Self::Card>,
-    ) -> Option<Self::Card>;
+    fn number_of_a_kind_with_exclusion(&self, num: usize, exclude: Option<Card>) -> Option<Card>;
+    fn number_of_a_kind(&self, num: usize) -> Option<Card> {
+        self.number_of_a_kind_with_exclusion(num, None)
+    }
     fn full_house(&self) -> Option<HandType>;
     fn two_pair(&self) -> Option<HandType>;
     fn hand_type(&self) -> HandType;
@@ -122,20 +87,14 @@ pub trait Hand {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct OriginalHand {
-    cards: Vec<OriginalCard>,
+pub struct NoJokerHand {
+    cards: Vec<Card>,
     bid: u64,
 }
 
-impl Hand for OriginalHand {
-    type Card = OriginalCard;
-
-    fn number_of_a_kind_with_exclusion(
-        &self,
-        num: usize,
-        exclude: Option<Self::Card>,
-    ) -> Option<Self::Card> {
-        Self::Card::iter()
+impl Hand for NoJokerHand {
+    fn number_of_a_kind_with_exclusion(&self, num: usize, exclude: Option<Card>) -> Option<Card> {
+        Card::iter()
             .filter(|&card| {
                 if let Some(exclude) = exclude {
                     card != exclude
@@ -144,26 +103,6 @@ impl Hand for OriginalHand {
                 }
             })
             .find(|card_type| self.cards.iter().filter(|&card| card == card_type).count() == num)
-    }
-
-    fn number_of_a_kind(&self, num: usize) -> Option<Self::Card> {
-        self.number_of_a_kind_with_exclusion(num, None)
-    }
-
-    fn at_least_number_of_a_kind(
-        &self,
-        num: usize,
-        exclude: Option<Self::Card>,
-    ) -> Option<Self::Card> {
-        Self::Card::iter()
-            .filter(|&card| {
-                if let Some(exclude) = exclude {
-                    card != exclude
-                } else {
-                    true
-                }
-            })
-            .find(|card_type| self.cards.iter().filter(|&card| card == card_type).count() >= num)
     }
 
     fn full_house(&self) -> Option<HandType> {
@@ -211,13 +150,13 @@ impl Hand for OriginalHand {
     }
 }
 
-impl PartialOrd for OriginalHand {
+impl PartialOrd for NoJokerHand {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for OriginalHand {
+impl Ord for NoJokerHand {
     fn cmp(&self, other: &Self) -> Ordering {
         let order = self.hand_type().cmp(&other.hand_type());
         if Ordering::Equal == order {
@@ -236,21 +175,14 @@ impl Ord for OriginalHand {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct NewHand {
-    cards: Vec<NewCard>,
+pub struct JokerHand {
+    cards: Vec<Card>,
     bid: u64,
 }
 
-impl Hand for NewHand {
-    type Card = NewCard;
-
-    fn number_of_a_kind_with_exclusion(
-        &self,
-        num: usize,
-        exclude: Option<Self::Card>,
-    ) -> Option<Self::Card> {
-        Self::Card::iter()
-            // .filter(|&card| card != Self::Card::J)
+impl Hand for JokerHand {
+    fn number_of_a_kind_with_exclusion(&self, num: usize, exclude: Option<Card>) -> Option<Card> {
+        Card::iter()
             .filter(|&card| {
                 if let Some(exclude) = exclude {
                     card != exclude
@@ -261,46 +193,20 @@ impl Hand for NewHand {
             .find(|card_type| {
                 self.cards
                     .iter()
-                    .filter(|&card| card == card_type || card == &Self::Card::J)
+                    .filter(|&card| card == card_type || card == &Card::J)
                     .count()
                     == num
             })
     }
 
-    fn number_of_a_kind(&self, num: usize) -> Option<Self::Card> {
-        self.number_of_a_kind_with_exclusion(num, None)
-    }
-
-    fn at_least_number_of_a_kind(
-        &self,
-        num: usize,
-        exclude: Option<Self::Card>,
-    ) -> Option<Self::Card> {
-        Self::Card::iter()
-            .filter(|&card| {
-                if let Some(exclude) = exclude {
-                    card != exclude
-                } else {
-                    true
-                }
-            })
-            .find(|card_type| {
-                self.cards
-                    .iter()
-                    .filter(|&card| card == card_type || card == &Self::Card::J)
-                    .count()
-                    >= num
-            })
-    }
-
     fn full_house(&self) -> Option<HandType> {
-        let three_of_a_kind = Self::Card::iter().find_map(|card_type| {
+        let three_of_a_kind = Card::iter().find_map(|card_type| {
             let locs: Vec<_> = self
                 .cards
                 .iter()
                 .enumerate()
                 .filter_map(|(i, card)| {
-                    if card == &card_type || card == &Self::Card::J {
+                    if card == &card_type || card == &Card::J {
                         Some(i)
                     } else {
                         None
@@ -314,12 +220,12 @@ impl Hand for NewHand {
             }
         })?;
         // let card_type = self.cards[three_of_a_kind[0]];
-        let _ = Self::Card::iter().find(|&card_type| {
+        let _ = Card::iter().find(|&card_type| {
             self.cards
                 .iter()
                 .enumerate()
                 .filter(|(i, &card)| {
-                    !three_of_a_kind.contains(i) && (card == card_type || card == Self::Card::J)
+                    !three_of_a_kind.contains(i) && (card == card_type || card == Card::J)
                 })
                 .count()
                 == 2
@@ -328,13 +234,13 @@ impl Hand for NewHand {
     }
 
     fn two_pair(&self) -> Option<HandType> {
-        let two_of_a_kind = Self::Card::iter().find_map(|card_type| {
+        let two_of_a_kind = Card::iter().find_map(|card_type| {
             let locs: Vec<_> = self
                 .cards
                 .iter()
                 .enumerate()
                 .filter_map(|(i, card)| {
-                    if card == &card_type || card == &Self::Card::J {
+                    if card == &card_type || card == &Card::J {
                         Some(i)
                     } else {
                         None
@@ -347,12 +253,12 @@ impl Hand for NewHand {
                 None
             }
         })?;
-        let _ = Self::Card::iter().find(|&card_type| {
+        let _ = Card::iter().find(|&card_type| {
             self.cards
                 .iter()
                 .enumerate()
                 .filter(|(i, &card)| {
-                    !two_of_a_kind.contains(i) && (card == card_type || card == Self::Card::J)
+                    !two_of_a_kind.contains(i) && (card == card_type || card == Card::J)
                 })
                 .count()
                 == 2
@@ -393,20 +299,20 @@ impl Hand for NewHand {
     }
 }
 
-impl PartialOrd for NewHand {
+impl PartialOrd for JokerHand {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for NewHand {
+impl Ord for JokerHand {
     fn cmp(&self, other: &Self) -> Ordering {
         let order = self.hand_type().cmp(&other.hand_type());
         if Ordering::Equal == order {
             self.cards
                 .iter()
                 .zip(other.cards.iter())
-                .find_map(|(x, y)| match x.cmp(y) {
+                .find_map(|(x, y)| match x.joker_cmp(*y) {
                     Ordering::Equal => None,
                     x => Some(x),
                 })
@@ -418,7 +324,7 @@ impl Ord for NewHand {
 }
 
 mod parse {
-    use crate::{DayResult, Error, Game, OriginalCard, OriginalHand};
+    use crate::{Card, DayResult, Error, Game, NoJokerHand};
     use std::str::FromStr;
     use winnow::{
         ascii::{dec_uint, multispace1},
@@ -427,23 +333,21 @@ mod parse {
         token::take,
     };
 
-    fn card(input: &mut &str) -> PResult<OriginalCard> {
-        take(1usize)
-            .try_map(OriginalCard::from_str)
-            .parse_next(input)
+    fn card(input: &mut &str) -> PResult<Card> {
+        take(1usize).try_map(Card::from_str).parse_next(input)
     }
 
-    fn hand(input: &mut &str) -> PResult<OriginalHand> {
+    fn hand(input: &mut &str) -> PResult<NoJokerHand> {
         let (cards, _, bid) = (repeat(1.., card), multispace1, dec_uint).parse_next(input)?;
-        Ok(OriginalHand { cards, bid })
+        Ok(NoJokerHand { cards, bid })
     }
 
-    fn game(input: &mut &str) -> PResult<Game<OriginalHand>> {
+    fn game(input: &mut &str) -> PResult<Game<NoJokerHand>> {
         let hands = separated(1.., hand, multispace1).parse_next(input)?;
         Ok(Game { hands })
     }
 
-    pub fn parse(input: &str) -> DayResult<Game<OriginalHand>> {
+    pub fn parse(input: &str) -> DayResult<Game<NoJokerHand>> {
         game.parse(input)
             .map_err(|e| Error::LineParsingError(e.to_string()))
     }
@@ -465,13 +369,13 @@ impl<H: Hand + Ord> Game<H> {
     }
 }
 
-impl Game<OriginalHand> {
-    fn convert(self) -> Game<NewHand> {
+impl Game<NoJokerHand> {
+    fn convert(self) -> Game<JokerHand> {
         let hands = self
             .hands
             .into_iter()
-            .map(|hand| NewHand {
-                cards: hand.cards.into_iter().map(NewCard::from).collect(),
+            .map(|hand| JokerHand {
+                cards: hand.cards,
                 bid: hand.bid,
             })
             .collect();
@@ -484,9 +388,11 @@ fn main() -> DayResult<()> {
     let mut game = parse(input)?;
     let winnings = game.winnings();
     println!("Winnings: {winnings}");
+    // assert_eq!(winnings, 253_910_319);
 
     let mut game2 = game.convert();
     let winnings_with_joker = game2.winnings();
     println!("Winnings with joker: {winnings_with_joker}");
+    // assert_eq!(winnings_with_joker, 254_083_736);
     Ok(())
 }
