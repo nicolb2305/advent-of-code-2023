@@ -19,27 +19,6 @@ impl<'a> Graph<&'a str> {
         None
     }
 
-    // fn count_steps_multiple(&self, directions: &[Direction]) -> Option<usize> {
-    //     let mut nodes: Vec<_> = self
-    //         .0
-    //         .keys()
-    //         .filter(|name| name.as_bytes()[2] == b'A')
-    //         .copied()
-    //         .collect();
-    //     for (count, dir) in directions.iter().cycle().enumerate() {
-    //         if nodes.iter().all(|name| name.as_bytes()[2] == b'Z') {
-    //             return Some(count);
-    //         }
-    //         for node in &mut nodes {
-    //             *node = self.0.get(node)?.turn(*dir);
-    //         }
-    //         if count % 1_000_000 == 0 {
-    //             dbg!(count);
-    //         }
-    //     }
-    //     None
-    // }
-
     fn count_steps_multiple(&self, directions: &[Direction]) -> Option<usize> {
         self.0
             .keys()
@@ -131,7 +110,14 @@ mod parse {
 fn main() -> Result<()> {
     let input = include_str!("../../input/day8.txt");
     let (directions, graph) = parse(input)?;
-    dbg!(graph.count_steps(&directions));
-    dbg!(graph.count_steps_multiple(&directions));
+
+    println!(
+        "Number of steps from \"AAA\" to \"ZZZ\": {}",
+        graph.count_steps(&directions).unwrap()
+    );
+    println!(
+        "Fewest steps for each path to reach their destination at once: {}",
+        graph.count_steps_multiple(&directions).unwrap()
+    );
     Ok(())
 }
