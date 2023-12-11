@@ -3,6 +3,10 @@ name = "advent-of-code-2023"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "advent_of_code_2023"
+path = "src/lib/lib.rs"
+
 [dependencies]
 anyhow = "1.0.75"
 color-eyre = "0.6.2"
