@@ -66,6 +66,10 @@ impl Coordinate {
             diagonal,
         }
     }
+
+    pub fn manhatten_distance(self, other: Self) -> usize {
+        self.x.abs_diff(other.x) + self.y.abs_diff(other.y)
+    }
 }
 
 pub struct CoordinateIterator {
