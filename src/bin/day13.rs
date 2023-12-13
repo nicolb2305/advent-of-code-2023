@@ -66,14 +66,10 @@ impl Floor {
     }
 
     fn mirror_value(&self, smudged: bool) -> usize {
-        if let Some(val) = self.horizontal_mirror_rows(smudged) {
-            return val * 100;
-        }
-        if let Some(val) = self.rotate().horizontal_mirror_rows(smudged) {
-            return val;
-        }
-
-        panic!("Failed to find any mirrored planes in: {self}")
+        self.horizontal_mirror_rows(smudged)
+            .map(|x| x * 100)
+            .or(self.rotate().horizontal_mirror_rows(smudged))
+            .expect("Failed to find any mirrored planes")
     }
 
     fn horizontal_mirror_rows(&self, smudged: bool) -> Option<usize> {
