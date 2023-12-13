@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use cached::proc_macro::cached;
+use memoize::memoize;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::fmt::{Display, Write};
 use winnow::{
@@ -81,7 +81,7 @@ fn parse(input: &str) -> Result<Row> {
     parser.parse(input).map_err(|e| anyhow!(e.to_string()))
 }
 
-#[cached]
+#[memoize]
 fn recursive_check(
     remaining: &'static [Spring],
     to_place: &'static [u64],
