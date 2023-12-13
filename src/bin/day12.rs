@@ -1,12 +1,48 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use memoize::memoize;
+use parse::parse;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use std::fmt::{Display, Write};
-use winnow::{
-    ascii::{dec_uint, multispace1},
-    combinator::{alt, repeat, separated, separated_pair},
-    prelude::*,
-};
+use std::{fmt::Display, iter::repeat};
+
+mod parse {
+    use crate::{Row, Spring, Springs};
+    use anyhow::{anyhow, Result};
+    use winnow::{
+        ascii::{dec_uint, multispace1},
+        combinator::{alt, repeat, separated, separated_pair},
+        prelude::*,
+    };
+
+    fn springs(input: &mut &str) -> PResult<Springs> {
+        repeat(
+            1..,
+            alt((
+                '.'.value(Spring::Operational),
+                '#'.value(Spring::Damaged),
+                '?'.value(Spring::Unknown),
+            )),
+        )
+        .map(Springs)
+        .parse_next(input)
+    }
+
+    fn row(input: &mut &str) -> PResult<Row> {
+        let (springs, spring_groups) = separated_pair(
+            springs,
+            multispace1,
+            separated(1.., dec_uint::<_, u64, _>, ','),
+        )
+        .parse_next(input)?;
+        Ok(Row {
+            springs,
+            spring_groups,
+        })
+    }
+
+    pub fn parse(input: &str) -> Result<Row> {
+        row.parse(input).map_err(|e| anyhow!(e.to_string()))
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Spring {
@@ -37,10 +73,7 @@ impl Display for Springs {
         write!(
             f,
             "{}",
-            self.0.iter().fold(String::new(), |mut out, spring| {
-                let _ = write!(out, "{spring}");
-                out
-            })
+            self.0.iter().map(ToString::to_string).collect::<String>()
         )
     }
 }
@@ -49,36 +82,6 @@ impl Display for Springs {
 struct Row {
     springs: Springs,
     spring_groups: Vec<u64>,
-}
-
-fn parse_springs(input: &mut &str) -> PResult<Springs> {
-    repeat(
-        1..,
-        alt((
-            '.'.value(Spring::Operational),
-            '#'.value(Spring::Damaged),
-            '?'.value(Spring::Unknown),
-        )),
-    )
-    .map(Springs)
-    .parse_next(input)
-}
-
-fn parser(input: &mut &str) -> PResult<Row> {
-    let (springs, spring_groups) = separated_pair(
-        parse_springs,
-        multispace1,
-        separated(1.., dec_uint::<_, u64, _>, ','),
-    )
-    .parse_next(input)?;
-    Ok(Row {
-        springs,
-        spring_groups,
-    })
-}
-
-fn parse(input: &str) -> Result<Row> {
-    parser.parse(input).map_err(|e| anyhow!(e.to_string()))
 }
 
 #[memoize]
@@ -123,13 +126,13 @@ fn recursive_check(
 }
 
 fn repeat_and_leak(row: &Row, amount: usize) -> (&'static [Spring], &'static [u64]) {
-    let springs = std::iter::repeat(row.springs.0.iter().copied().chain([Spring::Unknown]))
+    let springs = repeat(row.springs.0.iter().copied().chain([Spring::Unknown]))
         .take(amount)
         .flatten()
         .take(row.springs.0.len() * amount + (amount - 1))
         .collect::<Vec<_>>()
         .leak();
-    let spring_grouos = std::iter::repeat(row.spring_groups.iter().copied())
+    let spring_grouos = repeat(row.spring_groups.iter().copied())
         .take(amount)
         .flatten()
         .collect::<Vec<_>>()
